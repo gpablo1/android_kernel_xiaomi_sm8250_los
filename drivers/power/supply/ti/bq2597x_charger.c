@@ -56,7 +56,7 @@ enum {
 	ADC_MAX_NUM,
 };
 
-static int sc8551_adc_lsb[] = {
+static const int sc8551_adc_lsb[] = {
 	[ADC_IBUS] = SC8551_IBUS_ADC_LSB,  [ADC_VBUS] = SC8551_VBUS_ADC_LSB,
 	[ADC_VAC] = SC8551_VAC_ADC_LSB,	   [ADC_VOUT] = SC8551_VOUT_ADC_LSB,
 	[ADC_VBAT] = SC8551_VBAT_ADC_LSB,  [ADC_IBAT] = SC8551_IBAT_ADC_LSB,
@@ -1108,7 +1108,10 @@ static int bq2597x_get_adc_data(struct bq2597x *bq, int channel, int *result)
 		*result = t;
 		/* vbat need calibration read by NU2105 */
 		if (channel == ADC_VBAT) {
-			t = t * (1 + 1803 / 1000000);
+			t = div_s64((s64)t *
+                    (NU2105_SCALE_FACTOR +
+                     NU2105_CALIBRATION_FACTOR),
+                    NU2105_SCALE_FACTOR);
 			*result = t;
 		}
 	} else {
@@ -1122,7 +1125,8 @@ static int bq2597x_get_adc_data(struct bq2597x *bq, int channel, int *result)
 		*result = t;
 
 		if (bq->chip_vendor == SC8551) {
-			*result = (u64)t * (u64)sc8551_adc_lsb[channel] / 10000000;
+			*result = div_s64((s64)t * sc8551_adc_lsb[channel],
+                    SC8551_ADC_LSB_SCALE);
 		}
 	}
 
