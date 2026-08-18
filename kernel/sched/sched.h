@@ -1262,6 +1262,11 @@ struct rq_flags {
 #endif
 };
 
+extern struct task_struct *pick_next_task_fair(
+        struct rq *rq, struct task_struct *prev, struct rq_flags *rf);
+extern struct task_struct *pick_next_task_idle(
+        struct rq *rq, struct task_struct *prev, struct rq_flags *rf);
+
 static inline void rq_pin_lock(struct rq *rq, struct rq_flags *rf)
 {
 	rf->cookie = lockdep_pin_lock(&rq->lock);
