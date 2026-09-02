@@ -533,6 +533,24 @@ static struct tp_common_ops double_tap_ops = {
 	.show = double_tap_show,
 	.store = double_tap_store,
 };
+
+#ifdef CONFIG_TOUCHSCREEN_FOD
+static ssize_t fp_state_show(struct kobject *kobj,
+                             struct kobj_attribute *attr, char *buf)
+{
+	if (!fts_info)
+		return -EINVAL;
+
+	return sprintf(buf, "%lu,%lu,%d\n",
+		       fts_info->fod_pressed_x,
+		       fts_info->fod_pressed_y,
+		       fts_info->fod_pressed);
+}
+
+static struct tp_common_ops fp_state_ops = {
+	.show = fp_state_show,
+};
+#endif
 #endif
 
 #ifdef GRIP_MODE
@@ -3919,6 +3937,9 @@ static void fts_leave_pointer_event_handler(struct fts_ts_info *info,
 			input_report_key(info->input_dev, BTN_TOOL_FINGER, 0);
 
 		info->fod_pressed = false;
+		info->fod_pressed_x = 0;
+		info->fod_pressed_y = 0;
+		tp_common_notify_fp_state();
 		input_report_key(info->input_dev, BTN_INFO, 0);
 
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
@@ -4303,6 +4324,11 @@ static void fts_gesture_event_handler(struct fts_ts_info *info,
 		needCoords = 1;
 #ifdef CONFIG_TOUCHSCREEN_FOD
 		if (event[2] == GEST_ID_LONG_PRESS) {
+			info->fod_pressed = true;
+			info->fod_pressed_x = x;
+			info->fod_pressed_y = y;
+			tp_common_notify_fp_state();
+
 			if (!info->fod_down &&
 			    (info->fod_status == 1 || info->fod_status == 2)) {
 				MI_TOUCH_LOGI(1, "%s %s: FOD Down\n", tag,
@@ -4327,7 +4353,6 @@ static void fts_gesture_event_handler(struct fts_ts_info *info,
 				if ((info->sensor_sleep &&
 				     !info->sleep_finger) ||
 				    !info->sensor_sleep) {
-					info->fod_pressed = true;
 					input_report_key(info->input_dev,
 							 BTN_INFO, 1);
 					input_sync(info->input_dev);
@@ -8241,6 +8266,7 @@ static int fts_probe(struct spi_device *client)
 	tp_common_set_double_tap_ops(&double_tap_ops);
 #ifdef CONFIG_TOUCHSCREEN_FOD
 	tp_common_set_fod_status_ops(&fod_status_ops);
+	tp_common_set_fp_state_ops(&fp_state_ops);
 #endif
 #endif
 
