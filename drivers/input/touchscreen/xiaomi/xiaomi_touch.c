@@ -488,6 +488,178 @@ static ssize_t resolution_factor_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d", factor);
 }
 
+/* RisingOS/umi: GuidixX NotGameTurbo sysfs compatibility */
+
+static int xiaomi_touch_mode_get(int mode)
+{
+	struct xiaomi_touch_interface *touch_data;
+
+	if (!touch_pdata || !touch_pdata->touch_data)
+		return -ENODEV;
+
+	touch_data = touch_pdata->touch_data;
+
+	if (!touch_data->getModeValue)
+		return -EOPNOTSUPP;
+
+	return touch_data->getModeValue(mode, GET_CUR_VALUE);
+}
+
+static int xiaomi_touch_mode_set(int mode, int value)
+{
+	struct xiaomi_touch_interface *touch_data;
+
+	if (!touch_pdata || !touch_pdata->touch_data)
+		return -ENODEV;
+
+	touch_data = touch_pdata->touch_data;
+
+	if (!touch_data->setModeValue)
+		return -EOPNOTSUPP;
+
+	return touch_data->setModeValue(mode, value);
+}
+
+static ssize_t game_mode_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	int value = xiaomi_touch_mode_get(Touch_Game_Mode);
+
+	if (value < 0)
+		return value;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", value);
+}
+
+static ssize_t game_mode_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	unsigned int value;
+	int ret;
+
+	if (kstrtouint(buf, 10, &value))
+		return -EINVAL;
+
+	if (value > 1)
+		return -EINVAL;
+
+	ret = xiaomi_touch_mode_set(Touch_Game_Mode, value);
+
+	return ret < 0 ? ret : count;
+}
+
+static ssize_t bump_sample_rate_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	int value = xiaomi_touch_mode_get(Touch_Report_Rate);
+
+	if (value < 0)
+		return value;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", value);
+}
+
+static ssize_t bump_sample_rate_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	unsigned int value;
+	int ret;
+
+	if (kstrtouint(buf, 10, &value))
+		return -EINVAL;
+
+	ret = xiaomi_touch_mode_set(Touch_Report_Rate, value);
+
+	return ret < 0 ? ret : count;
+}
+
+struct xiaomi_touch_filter {
+	const char *name;
+	int mode;
+	bool supported;
+};
+
+static const struct xiaomi_touch_filter xiaomi_touch_filters[] = {
+	{ "touch_up_threshold", Touch_UP_THRESHOLD, true },
+	{ "touch_tolerance", Touch_Tolerance, true },
+#ifdef CONFIG_TOUCHSCREEN_SUPPORT_NEW_GAME_MODE
+	{ "touch_aim_sensitivity", Touch_Aim_Sensitivity, true },
+	{ "touch_tap_stability", Touch_Tap_Stability, true },
+#else
+	{ "touch_aim_sensitivity", 0, false },
+	{ "touch_tap_stability", 0, false },
+#endif
+	{ "touch_edge_filter", Touch_Edge_Filter, true },
+	{ "panel_orientation", Touch_Panel_Orientation, true },
+#ifdef CONFIG_TOUCHSCREEN_SUPPORT_NEW_GAME_MODE
+	{ "expert_mode", Touch_Expert_Mode, true },
+#else
+	{ "expert_mode", 0, false },
+#endif
+};
+
+static ssize_t touch_filters_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(xiaomi_touch_filters); i++) {
+		int value;
+
+		if (!xiaomi_touch_filters[i].supported) {
+			count += snprintf(buf + count, PAGE_SIZE - count,
+					  "%36s[%02zu]: unsupported\n",
+					  xiaomi_touch_filters[i].name, i);
+			continue;
+		}
+
+		value = xiaomi_touch_mode_get(xiaomi_touch_filters[i].mode);
+
+		if (value < 0)
+			count += snprintf(buf + count, PAGE_SIZE - count,
+					  "%36s[%02zu]: unsupported (%d)\n",
+					  xiaomi_touch_filters[i].name, i,
+					  value);
+		else
+			count += snprintf(buf + count, PAGE_SIZE - count,
+					  "%36s[%02zu]: %d\n",
+					  xiaomi_touch_filters[i].name, i,
+					  value);
+	}
+
+	return count;
+}
+
+static ssize_t touch_filters_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	unsigned int filter;
+	unsigned int value;
+	int ret;
+
+	if (sscanf(buf, "%u %u", &filter, &value) != 2)
+		return -EINVAL;
+
+	if (filter >= ARRAY_SIZE(xiaomi_touch_filters))
+		return -EINVAL;
+
+	if (!xiaomi_touch_filters[filter].supported)
+		return -EOPNOTSUPP;
+
+	ret = xiaomi_touch_mode_set(xiaomi_touch_filters[filter].mode, value);
+
+	return ret < 0 ? ret : count;
+}
+
+static DEVICE_ATTR_RW(game_mode);
+static DEVICE_ATTR_RW(bump_sample_rate);
+static DEVICE_ATTR_RW(touch_filters);
+
 static DEVICE_ATTR(palm_sensor, (S_IRUGO | S_IWUSR | S_IWGRP), palm_sensor_show,
 		   palm_sensor_store);
 
@@ -513,6 +685,9 @@ static DEVICE_ATTR(partial_diff_data, (S_IRUGO | S_IWUSR | S_IWGRP),
 static DEVICE_ATTR(resolution_factor, 0644, resolution_factor_show, NULL);
 
 static struct attribute *touch_attr_group[] = {
+	&dev_attr_game_mode.attr,
+	&dev_attr_bump_sample_rate.attr,
+	&dev_attr_touch_filters.attr,
 	&dev_attr_palm_sensor.attr,	  &dev_attr_p_sensor.attr,
 	&dev_attr_panel_vendor.attr,	  &dev_attr_panel_color.attr,
 	&dev_attr_panel_display.attr,	  &dev_attr_touch_vendor.attr,
