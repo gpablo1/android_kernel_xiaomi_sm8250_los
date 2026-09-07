@@ -950,6 +950,12 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	gpu_profile = &pwrscale->gpu_profile;
 	profile = &pwrscale->gpu_profile.profile;
 
+	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
+	if (!pwrscale->devfreq_wq) {
+		pwrscale->enabled = false;
+		return -ENOMEM;
+	}
+
 	pwr->nb.notifier_call = opp_notify;
 
 	dev_pm_opp_register_notifier(dev, &pwr->nb);
@@ -1032,6 +1038,12 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 			governor, pwrscale->gpu_profile.private_data);
 	if (IS_ERR(devfreq)) {
 		device->pwrscale.enabled = false;
+		destroy_workqueue(pwrscale->devfreq_wq);
+		pwrscale->devfreq_wq = NULL;
+		kfree(kgsl_midframe);
+		kgsl_midframe = NULL;
+		srcu_cleanup_notifier_head(&pwrscale->nh);
+		dev_pm_opp_unregister_notifier(dev, &pwr->nb);
 		return PTR_ERR(devfreq);
 	}
 
@@ -1074,7 +1086,6 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	ret = sysfs_create_link(&device->dev->kobj,
 			&devfreq->dev.kobj, "devfreq");
 
-	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
 	INIT_WORK(&pwrscale->devfreq_suspend_ws, do_devfreq_suspend);
 	INIT_WORK(&pwrscale->devfreq_resume_ws, do_devfreq_resume);
 	INIT_WORK(&pwrscale->devfreq_notify_ws, do_devfreq_notify);
