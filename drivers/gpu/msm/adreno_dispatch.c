@@ -283,17 +283,6 @@ static void _retire_timestamp(struct kgsl_drawobj *drawobj)
 	/* Retire pending GPU events for the object */
 	kgsl_process_event_group(device, &context->events);
 
-	/*
-	 * For A3xx we still get the rptr from the CP_RB_RPTR instead of
-	 * rptr scratch out address. At this point GPU clocks turned off.
-	 * So avoid reading GPU register directly for A3xx.
-	 */
-	if (adreno_is_a3xx(ADRENO_DEVICE(device)))
-		trace_adreno_cmdbatch_retired(drawobj, -1, 0, 0, drawctxt->rb,
-				0, 0);
-	else
-		trace_adreno_cmdbatch_retired(drawobj, -1, 0, 0, drawctxt->rb,
-			adreno_get_rptr(drawctxt->rb), 0);
 	kgsl_drawobj_destroy(drawobj);
 }
 
