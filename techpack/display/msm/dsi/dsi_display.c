@@ -15,6 +15,7 @@
 #include "dsi_display.h"
 #include "dsi_panel.h"
 #include "dsi_panel_mi.h"
+#include "dsi_mi_feature.h"
 #include "dsi_ctrl.h"
 #include "dsi_ctrl_hw.h"
 #include "dsi_drm.h"
@@ -5162,11 +5163,62 @@ static DEVICE_ATTR(dimlayer_exposure, 0644,
 			sysfs_dimlayer_exposure_write);
 #endif
 
+static ssize_t sysfs_hbm_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct dsi_display *display;
+
+	display = dev_get_drvdata(dev);
+	if (!display || !display->panel) {
+		pr_err("Invalid display or panel\n");
+		return -EINVAL;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			display->panel->mi_cfg.hbm_enabled ? 1 : 0);
+}
+
+static ssize_t sysfs_hbm_write(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dsi_display *display;
+	unsigned long value;
+	int rc;
+
+	display = dev_get_drvdata(dev);
+	if (!display || !display->panel) {
+		pr_err("Invalid display or panel\n");
+		return -EINVAL;
+	}
+
+	rc = kstrtoul(buf, 10, &value);
+	if (rc)
+		return rc;
+
+	if (value > 1)
+		return -EINVAL;
+
+	rc = dsi_panel_set_disp_param(
+			display->panel,
+			value ? DISPPARAM_HBM_ON : DISPPARAM_HBM_OFF);
+	if (rc) {
+		pr_err("Failed to set HBM=%lu, rc=%d\n", value, rc);
+		return rc;
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(hbm, 0644,
+			sysfs_hbm_read,
+			sysfs_hbm_write);
+
 static struct attribute *display_fs_attrs[] = {
 	&dev_attr_fod_ui.attr,
 #ifdef CONFIG_DRM_SDE_EXPO
 	&dev_attr_dimlayer_exposure.attr,
 #endif
+	&dev_attr_hbm.attr,
 	NULL,
 };
 
