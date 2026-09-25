@@ -186,7 +186,8 @@ EXPORT_SYMBOL(vfs_getattr);
  */
 #ifdef CONFIG_KSU_SUSFS
 extern struct static_key_true ksu_is_init_rc_hook_enabled;
-extern struct static_key_true ksu_su_compat_enabled;
+extern bool ksu_su_compat_enabled;
+extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 
 extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
 extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
@@ -257,7 +258,8 @@ retry:
 	fname = getname_flags(filename, lookup_flags, NULL);
 
 	if (!susfs_is_current_proc_no_su() &&
-	    static_branch_likely(&ksu_su_compat_enabled))
+	    likely(ksu_su_compat_enabled) &&
+	    unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))
 		ksu_handle_stat(&dfd, &fname, &flags);
 
 	error = filename_lookup(dfd, fname, lookup_flags, &path, NULL);

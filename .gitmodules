@@ -1,3 +1,6 @@
 [submodule "KernelSU"]
 	path = KernelSU
 	url = https://github.com/ReSukiSU/ReSukiSU.git
+[submodule "SukiSU-Ultra"]
+	path = SukiSU-Ultra
+	url = https://github.com/SukiSU-Ultra/SukiSU-Ultra.git

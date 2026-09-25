@@ -1736,7 +1736,7 @@ static int exec_binprm(struct linux_binprm *bprm)
 __attribute__((hot))
 extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr,
 				void *argv, void *envp, int *flags);
-extern struct static_key_true ksu_su_compat_enabled;
+extern bool ksu_su_compat_enabled;
 extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 				void *argv, void *envp, int *flags);
@@ -1758,7 +1758,7 @@ static int __do_execve_file(int fd, struct filename *filename,
 	if (likely(susfs_is_current_proc_no_su()))
 		goto ksu_susfs_exec_orig_flow;
 
-	if (static_branch_likely(&ksu_su_compat_enabled)) {
+	if (likely(ksu_su_compat_enabled)) {
 		if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
 			ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
 		else
